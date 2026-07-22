@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PocketRig</title>
+<style>
+  @font-face{
+    font-family:'Chakra Petch';
+    src:url('chakra.ttf') format('truetype');
+    font-weight:600; font-display:swap;
+  }
+  :root{
+    --bg:#0B0E13; --bg2:#0d1219; --surface:#141a24; --surface2:#1b2331;
+    --line:#242e3d; --hi:#EAF1F8; --lo:#8394ab; --lo2:#5c6b82;
+    --mono:'Roboto Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+    --sans:system-ui,'Roboto','Segoe UI',sans-serif;
+    /* thermal spectrum */
+    --t-cool:#22D3EE; --t-good:#34D399; --t-warm:#FBBF24; --t-hot:#FB7185; --t-crit:#F43F5E;
+    --amber:#FF7A1A;            /* "mining is ON" identity hue */
+    --amber-soft:#ff9a4d;
+    --accent:var(--t-good);     /* dynamic, set from temp in JS */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #10161f 0%, var(--bg) 55%, var(--bg2) 100%);
+    color:var(--hi); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    padding:calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 22px);
+    max-width:520px; margin:0 auto; min-height:100%;
+    overflow-x:hidden;
+  }
+
+  /* ---- ambient thermal aurora (lives behind the frosted glass) ---- */
+  .aurora{position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none;
+    filter:blur(60px) saturate(1.3); opacity:.5; transition:opacity 1.2s ease}
+  body.on .aurora{opacity:.85}
+  .aurora span{position:absolute; border-radius:50%; mix-blend-mode:screen;
+    transition:background 1.2s ease, transform 1.6s ease}
+  .aurora .a1{width:70%; aspect-ratio:1; left:-12%; top:-6%;
+    background:radial-gradient(circle, var(--accent) 0%, transparent 68%)}
+  .aurora .a2{width:64%; aspect-ratio:1; right:-14%; top:22%;
+    background:radial-gradient(circle, var(--amber) 0%, transparent 66%); opacity:.7}
+  .aurora .a3{width:78%; aspect-ratio:1; left:8%; bottom:-18%;
+    background:radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity:.55}
+  body.on .aurora .a1{animation:drift1 14s ease-in-out infinite}
+  body.on .aurora .a3{animation:drift2 18s ease-in-out infinite}
+  @keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6%,4%) scale(1.08)}}
+  @keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5%,-3%) scale(1.1)}}
+
+  /* ---- frosted glass surface (reused everywhere) ---- */
+  .glass{
+    background:linear-gradient(150deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+    -webkit-backdrop-filter:blur(22px) saturate(1.4); backdrop-filter:blur(22px) saturate(1.4);
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 0 -1px 0 rgba(0,0,0,.25),
+               0 10px 34px -14px rgba(0,0,0,.7);
+  }
+
+  /* ---- header ---- */
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+  .wordmark{font-family:var(--mono); font-size:13px; letter-spacing:.42em;
+    font-weight:500; color:var(--hi); padding-left:.42em}
+  .wordmark b{color:var(--amber); font-weight:500}
+  .status{display:flex; align-items:center; gap:7px; font-family:var(--mono);
+    font-size:11px; letter-spacing:.14em; color:var(--lo); text-transform:uppercase}
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--lo2);
+    box-shadow:0 0 0 0 rgba(255,122,26,0); transition:background .3s}
+  body.on .dot{background:var(--amber); animation:beat 2.4s ease-in-out infinite}
+  @keyframes beat{0%,100%{box-shadow:0 0 0 0 rgba(255,122,26,.5)}50%{box-shadow:0 0 0 6px rgba(255,122,26,0)}}
+
+  /* ---- hero: core ring ---- */
+  .hero{position:relative; width:100%; aspect-ratio:1/1; max-width:360px; margin:6px auto 2px}
+  .ring{position:absolute; inset:0}
+  .core{
+    position:absolute; width:20%; aspect-ratio:1/1; left:40%; top:40%;
+    clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);
+    background:linear-gradient(150deg, rgba(255,255,255,.06), rgba(255,255,255,.015)); border:0;
+    -webkit-backdrop-filter:blur(12px) saturate(1.3); backdrop-filter:blur(12px) saturate(1.3);
+    display:flex; align-items:center; justify-content:center;
+    transition:background .5s ease, filter .5s ease, transform .4s cubic-bezier(.2,.9,.3,1.3);
+    transform:scale(.86);
+  }
+  .core::after{content:attr(data-n); font-family:'Chakra Petch',var(--mono); font-size:14px;
+    font-weight:600; color:var(--amber); transition:color .4s}
+  .core.lit{transform:scale(1); background:var(--accent);
+    filter:drop-shadow(0 0 14px color-mix(in srgb,var(--accent) 65%,transparent));}
+  .core.lit::after{color:var(--amber); font-weight:700;
+    text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  body.on .core.lit{animation:corepulse var(--pulse,2.6s) ease-in-out infinite}
+  @keyframes corepulse{0%,100%{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--accent) 45%,transparent))}
+    50%{filter:drop-shadow(0 0 20px color-mix(in srgb,var(--accent) 80%,transparent))}}
+
+  .hub{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:52%; aspect-ratio:1/1;
+    clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);
+    background:linear-gradient(155deg, rgba(255,255,255,.07), rgba(255,255,255,.015));
+    -webkit-backdrop-filter:blur(24px) saturate(1.5); backdrop-filter:blur(24px) saturate(1.5);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .hub .val{font-family:var(--mono); font-size:34px; font-weight:600; line-height:1;
+    letter-spacing:-.02em; font-variant-numeric:tabular-nums; color:var(--hi)}
+  @keyframes sharepop{0%{transform:scale(1)}30%{transform:scale(1.16); filter:drop-shadow(0 0 16px var(--accent))}100%{transform:scale(1); filter:none}}
+  .hub .val.pop{animation:sharepop .55s cubic-bezier(.2,.9,.3,1.3)}
+  @keyframes ringflash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}100%{box-shadow:0 0 0 26px transparent}}
+  .hero.hit::after{content:""; position:absolute; inset:16%;
+    clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);
+    animation:ringflash .7s ease-out; pointer-events:none}
+  .hub .unit{font-family:var(--mono); font-size:11px; letter-spacing:.28em; color:var(--lo)}
+  .hub .sub{font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--lo2); margin-top:3px}
+  body.on .hub{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,var(--line)),
+    0 0 40px -8px color-mix(in srgb,var(--accent) 40%,transparent)}
+  body.on .hub .val{color:var(--accent)}
+
+  .reserve{display:flex; justify-content:center; gap:8px; margin:2px 0 14px; color:var(--lo2);
+    font-family:var(--mono); font-size:10px; letter-spacing:.14em; align-items:center}
+  .reserve i{width:8px; height:9px; display:inline-block;
+    clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%); background:var(--line)}
+
+  /* ---- primary toggle ---- */
+  .mine{
+    width:100%; border-radius:18px;
+    background:linear-gradient(150deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    -webkit-backdrop-filter:blur(22px) saturate(1.4); backdrop-filter:blur(22px) saturate(1.4);
+    border:1px solid rgba(255,255,255,.12);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 10px 30px -14px rgba(0,0,0,.6);
+    color:var(--amber); font-family:'Chakra Petch',var(--mono); font-weight:600;
+    letter-spacing:.22em; font-size:18px;
+    text-transform:uppercase; padding:20px; margin:2px 0 20px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    transition:.3s; -webkit-tap-highlight-color:transparent; position:relative; overflow:hidden;
+  }
+  .mine .pw{font-size:19px}
+  body.on .mine{
+    background:linear-gradient(135deg,var(--amber),#e85d00);
+    color:#000; border-color:transparent; font-weight:700;
+    box-shadow:0 8px 30px -10px rgba(255,122,26,.7);
+  }
+  .mine:active{transform:scale(.985)}
+
+  /* ---- section + controls ---- */
+  .lbl{font-family:var(--mono); font-size:10px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--lo2); margin:0 2px 8px}
+  .block{margin-bottom:18px}
+  .seg{display:grid; grid-template-columns:repeat(5,1fr); gap:6px}
+  .seg button{
+    font-family:'Chakra Petch',var(--mono); font-size:16px; font-weight:600;
+    letter-spacing:.06em; padding:13px 4px;
+    color:var(--amber); border-radius:13px; cursor:pointer; transition:.2s;
+    -webkit-tap-highlight-color:transparent;
+    background:linear-gradient(150deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+    -webkit-backdrop-filter:blur(16px) saturate(1.3); backdrop-filter:blur(16px) saturate(1.3);
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10);
+  }
+  .seg button small{display:block; font-family:'Chakra Petch',var(--mono); font-weight:600;
+    font-size:8px; letter-spacing:.16em; color:var(--amber-soft); margin-top:4px}
+  .seg button.sel{background:var(--surface2); color:var(--amber); border-color:color-mix(in srgb,var(--amber) 55%,var(--line))}
+  .seg button.sel small{color:var(--amber)}
+  .seg button[data-mode="8"].sel{border-color:color-mix(in srgb,#ff6b4a 60%,var(--line)); color:var(--amber)}
+  .seg button[data-mode="8"].sel small{color:var(--amber-soft)}
+  .seg button.adaptive.sel{border-color:var(--amber); color:var(--amber)}
+  .seg button.adaptive.sel small{color:var(--amber)}
+
+  /* ---- toggle switch ---- */
+  .toggle{display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:13px 15px; border-radius:14px; cursor:pointer; -webkit-tap-highlight-color:transparent}
+  .tglabel b{display:block; font-size:13.5px; color:var(--hi); font-weight:600; letter-spacing:.01em}
+  .tglabel span{display:block; font-family:var(--mono); font-size:9px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--lo2); margin-top:4px}
+  .sw{flex:none; width:46px; height:27px; border-radius:20px; position:relative; transition:.22s;
+    background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.14);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+  .sw i{position:absolute; top:2px; left:2px; width:21px; height:21px; border-radius:50%;
+    background:#c9cfd8; transition:.22s cubic-bezier(.3,1.4,.5,1); box-shadow:0 1px 3px rgba(0,0,0,.45)}
+  .sw.on{background:color-mix(in srgb,var(--accent) 55%,transparent);
+    border-color:color-mix(in srgb,var(--accent) 70%,var(--line))}
+  .sw.on i{left:21px; background:#eafcff; box-shadow:0 0 10px color-mix(in srgb,var(--accent) 60%,transparent)}
+
+  /* ---- live pulse card (sparkline + session stats) ---- */
+  .pulse{margin:2px 0 16px; padding:11px 14px 9px; border-radius:16px; opacity:.55; transition:opacity .4s}
+  body.on .pulse{opacity:1}
+  .pulse canvas{width:100%; height:52px; display:block}
+  .pulseMeta{display:flex; justify-content:space-between; margin-top:7px}
+  .pulseMeta div{text-align:center; flex:1}
+  .pulseMeta div+div{border-left:1px solid rgba(255,255,255,.07)}
+  .pulseMeta b{display:block; font-family:var(--mono); font-size:14px; color:var(--hi);
+    letter-spacing:.01em; font-weight:600}
+  .pulseMeta .g{color:var(--accent)}
+  .pulseMeta span{display:block; font-family:var(--mono); font-size:7.5px; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--lo2); margin-top:3px}
+  /* accepted-share ripple on the lit cores */
+  @keyframes coreburst{0%{transform:scale(1)}45%{transform:scale(1.32);
+    filter:drop-shadow(0 0 14px var(--accent))}100%{transform:scale(1)}}
+  .core.burst{animation:coreburst .5s cubic-bezier(.2,.9,.3,1.4)}
+  /* milestone particle burst */
+  .particle{position:absolute; left:50%; top:46%; width:7px; height:7px; border-radius:50%;
+    background:var(--amber); box-shadow:0 0 9px var(--amber); pointer-events:none;
+    transform:translate(-50%,-50%); animation:particle .85s ease-out forwards}
+  @keyframes particle{
+    0%{opacity:1; transform:translate(-50%,-50%) translate(0,0) scale(1)}
+    100%{opacity:0; transform:translate(-50%,-50%) translate(var(--tx),var(--ty)) scale(.25)}}
+
+  .field{display:flex; align-items:center; gap:10px; border-radius:14px; padding:0 14px;
+    background:linear-gradient(150deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+    -webkit-backdrop-filter:blur(16px) saturate(1.3); backdrop-filter:blur(16px) saturate(1.3);
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10);}
+  .field input, .field select{
+    flex:1; background:transparent; border:0; outline:0; color:var(--hi);
+    font-family:var(--mono); font-size:13px; padding:15px 0; letter-spacing:.02em;
+    min-width:0; text-overflow:ellipsis;
+  }
+  .field select{appearance:none; cursor:pointer; letter-spacing:.06em}
+  .field .chev{color:var(--lo2); font-size:12px}
+  .field.focus{border-color:color-mix(in srgb,var(--amber) 60%,var(--line))}
+  .custompool{display:none; margin-top:8px}
+  .custompool.show{display:flex}
+
+  /* ---- wallet QR ---- */
+  .qrbtn{font-size:18px; color:var(--amber); cursor:pointer; padding:6px 2px; line-height:1;
+    -webkit-tap-highlight-color:transparent; transition:transform .15s}
+  .qrbtn:active{transform:scale(.88)}
+  .qrmodal{position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    padding:24px; background:rgba(6,9,14,.74); -webkit-backdrop-filter:blur(9px); backdrop-filter:blur(9px)}
+  .qrmodal.show{display:flex; animation:qrfade .25s ease}
+  @keyframes qrfade{from{opacity:0}to{opacity:1}}
+  .qrcard{padding:24px 22px 20px; border-radius:24px; width:min(86vw,350px); text-align:center}
+  .qrtitle{font-family:'Chakra Petch',var(--mono); font-weight:600; letter-spacing:.24em; color:var(--amber);
+    font-size:14px; text-transform:uppercase; margin-bottom:18px}
+  .qrframe{background:#fff; border-radius:16px; padding:14px; display:inline-block; line-height:0;
+    box-shadow:0 12px 44px -12px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.05)}
+  .qrframe canvas{display:block; width:250px; height:250px; image-rendering:pixelated}
+  .qraddr{font-family:var(--mono); font-size:10px; color:var(--lo); word-break:break-all;
+    margin:18px 2px 2px; line-height:1.6}
+  .qrclose{margin-top:16px; font-family:'Chakra Petch',var(--mono); font-weight:600; letter-spacing:.2em;
+    color:var(--amber); text-transform:uppercase; font-size:14px; cursor:pointer; padding:10px}
+
+  /* ---- import & share actions ---- */
+  .actionrow{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .act{display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+    font-family:'Chakra Petch',var(--mono); font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+    font-size:12px; color:var(--amber); padding:14px 10px; border-radius:14px;
+    -webkit-tap-highlight-color:transparent; transition:transform .15s, border-color .2s;
+    background:linear-gradient(150deg, rgba(255,255,255,.055), rgba(255,255,255,.015));
+    -webkit-backdrop-filter:blur(18px) saturate(1.35); backdrop-filter:blur(18px) saturate(1.35);
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 8px 24px -16px rgba(0,0,0,.6)}
+  .act span{font-size:16px; line-height:1}
+  .act:active{transform:scale(.96); border-color:color-mix(in srgb,var(--amber) 55%,var(--line))}
+
+  /* ---- scanner overlay ---- */
+  .scanview{position:relative; width:min(78vw,300px); aspect-ratio:1/1; border-radius:18px; overflow:hidden;
+    background:#05070b; box-shadow:0 12px 44px -12px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.05)}
+  .scanview video{width:100%; height:100%; object-fit:cover; display:block}
+  .scanframe{position:absolute; inset:14%; border-radius:12px; pointer-events:none;
+    box-shadow:0 0 0 2px color-mix(in srgb,var(--amber) 70%,transparent),
+      0 0 0 100vmax rgba(6,9,14,.32) inset}
+  .scanframe::before{content:""; position:absolute; left:0; right:0; height:2px; top:0;
+    background:linear-gradient(90deg,transparent,var(--amber),transparent);
+    animation:scanline 2.2s ease-in-out infinite; box-shadow:0 0 10px var(--amber)}
+  @keyframes scanline{0%,100%{top:4%} 50%{top:94%}}
+  .scanstatus{font-family:var(--mono); font-size:11px; color:var(--lo); margin:16px 6px 2px; min-height:15px; line-height:1.5}
+  .scanactions{display:flex; gap:10px; margin-top:16px; justify-content:center}
+  .scanactions label,.scanactions .qrclose{margin-top:0}
+  .scanactions label{position:relative; overflow:hidden; font-family:'Chakra Petch',var(--mono); font-weight:600;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--amber); font-size:13px; cursor:pointer; padding:10px 14px}
+  .scanactions label input{position:absolute; inset:0; opacity:0; cursor:pointer}
+  .shareurl{font-family:var(--mono); font-size:12px; color:var(--amber); word-break:break-all;
+    margin:16px 4px 2px; line-height:1.5}
+  .sharehint{font-family:var(--mono); font-size:10px; color:var(--lo2); margin:8px 6px 0; line-height:1.6}
+
+  /* ---- workload readouts ---- */
+  .rule{display:flex; align-items:center; gap:10px; color:var(--lo2);
+    font-family:var(--mono); font-size:10px; letter-spacing:.24em; text-transform:uppercase; margin:6px 2px 12px}
+  .rule::before,.rule::after{content:""; height:1px; flex:1; background:var(--line)}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .stat{border-radius:16px; padding:14px;
+    background:linear-gradient(150deg, rgba(255,255,255,.055), rgba(255,255,255,.015));
+    -webkit-backdrop-filter:blur(18px) saturate(1.35); backdrop-filter:blur(18px) saturate(1.35);
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 8px 24px -16px rgba(0,0,0,.6);}
+  .stat .k{font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--lo2)}
+  .stat .v{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:6px;
+    font-variant-numeric:tabular-nums; display:flex; align-items:baseline; gap:5px}
+  .stat .v small{font-size:11px; font-weight:400; color:var(--lo)}
+  .bar{height:5px; border-radius:3px; background:var(--surface2); margin-top:10px; overflow:hidden}
+  .bar i{display:block; height:100%; width:0; border-radius:3px; transition:width .6s ease, background .6s}
+  .pilltext{display:flex; align-items:center; gap:7px; font-size:14px; margin-top:6px; font-family:var(--mono)}
+  .pilltext .d{width:8px;height:8px;border-radius:50%;background:var(--lo2)}
+  .pilltext.ok .d{background:var(--t-good); box-shadow:0 0 8px var(--t-good)}
+  .pilltext.warn .d{background:var(--t-warm)}
+  .reason{font-family:var(--mono); font-size:11px; color:var(--lo); letter-spacing:.03em;
+    text-align:center; margin-top:16px; min-height:14px; opacity:.85}
+  .reason b{color:var(--accent); font-weight:500}
+  .devfee{font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    text-align:center; color:var(--lo2); margin-top:12px; transition:color .4s, opacity .4s; opacity:.7}
+  .devfee.active{color:var(--amber); opacity:1}
+  footer{text-align:center; margin-top:22px; padding-bottom:26px}
+  footer .tagline{font-family:var(--mono); font-size:9px; letter-spacing:.2em;
+    color:var(--lo2); text-transform:uppercase}
+  .studio{margin-top:20px; display:flex; flex-direction:column; align-items:center; gap:6px}
+  .studio .blade{display:flex; align-items:center; gap:12px; width:100%; justify-content:center;
+    color:var(--line)}
+  .studio .blade::before,.studio .blade::after{content:""; height:1px; width:52px;
+    background:linear-gradient(90deg,transparent,var(--line))}
+  .studio .blade::after{transform:scaleX(-1)}
+  .studio .blade i{width:6px; height:7px; background:var(--amber);
+    clip-path:polygon(50% 0,100% 100%,0 100%); opacity:.9}
+  .studio .jk{
+    font-family:'Chakra Petch',var(--sans); font-weight:600; font-size:25px;
+    letter-spacing:.12em; text-transform:uppercase; line-height:1;
+    background:linear-gradient(180deg,#ffd9a8 0%,var(--amber) 55%,#e05600 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 10px rgba(255,122,26,.28));
+  }
+  .studio .st{font-family:var(--mono); font-size:9px; letter-spacing:.62em;
+    text-transform:uppercase; color:var(--lo); padding-left:.62em}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+</head>
+<body>
+  <div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+
+  <header>
+    <div class="wordmark">POCKET<b>RIG</b></div>
+    <div class="status"><span class="dot"></span><span id="stateLabel">idle</span></div>
+  </header>
+
+  <div class="hero">
+    <div class="ring" id="ring"></div>
+    <div class="hub">
+      <div class="val" id="hrVal">0</div>
+      <div class="unit">H/S</div>
+      <div class="sub" id="hrSub">— accepted</div>
+    </div>
+  </div>
+  <div class="reserve" id="reserveNote"><i></i><i></i> <span id="reserveTxt">2 cores reserved for system</span></div>
+
+  <div class="pulse glass" id="pulseCard">
+    <canvas id="spark"></canvas>
+    <div class="pulseMeta">
+      <div><b id="hrPeak">0</b><span>peak h/s</span></div>
+      <div><b class="g" id="estDay">≈ 0</b><span>µXMR / day</span></div>
+      <div><b id="uptime">0:00</b><span>session</span></div>
+    </div>
+  </div>
+
+  <button class="mine" id="mineBtn"><span class="pw">⏻</span><span id="mineLabel">Start mining</span></button>
+
+  <div class="block">
+    <div class="lbl">Mode</div>
+    <div class="seg" id="modeSeg">
+      <button data-mode="2">2<small>CORE</small></button>
+      <button data-mode="4">4<small>CORE</small></button>
+      <button data-mode="6">6<small>CORE</small></button>
+      <button data-mode="8">8<small>MAX</small></button>
+      <button data-mode="adaptive" class="adaptive sel">A<small>ADAPT</small></button>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="lbl">Wallet address</div>
+    <div class="field" id="walletField">
+      <input id="wallet" spellcheck="false" autocapitalize="off" autocomplete="off"
+             placeholder="Your Monero address"
+             value="">
+      <span class="qrbtn" id="qrBtn" role="button" aria-label="Show wallet QR">▦</span>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="lbl">Import &amp; share</div>
+    <div class="actionrow">
+      <button class="act" id="scanBtn"><span>▣</span>Scan wallet</button>
+      <button class="act" id="shareBtn"><span>⇆</span>Share app</button>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="lbl">Pool</div>
+    <div class="field">
+      <select id="pool">
+        <option value="gulf.moneroocean.stream:10001">MoneroOcean · auto-switch</option>
+        <option value="pool.supportxmr.com:3333">SupportXMR</option>
+        <option value="pool.hashvault.pro:3333">HashVault</option>
+        <option value="xmr-eu1.nanopool.org:14444">Nanopool</option>
+        <option value="xmr.2miners.com:2222">2Miners</option>
+        <option value="custom">Custom pool…</option>
+      </select>
+      <span class="chev">▾</span>
+    </div>
+    <div class="field custompool" id="customPoolField">
+      <input id="customPool" spellcheck="false" autocapitalize="off" autocomplete="off"
+             placeholder="host:port  ·  e.g. pool.example.com:3333">
+      <span class="chev">⛓</span>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="lbl">Automation</div>
+    <div class="toggle glass" id="autoChargeRow">
+      <div class="tglabel"><b>Auto-start when charging</b><span>Mines automatically when you plug in</span></div>
+      <div class="sw" id="autoChargeSw"><i></i></div>
+    </div>
+  </div>
+
+  <div class="rule">workload</div>
+  <div class="grid">
+    <div class="stat">
+      <div class="k">Chip temp</div>
+      <div class="v" id="tempV">—<small>°C</small></div>
+      <div class="bar"><i id="tempBar"></i></div>
+    </div>
+    <div class="stat">
+      <div class="k">Active cores</div>
+      <div class="v" id="coresV">0<small id="coresMax">/6</small></div>
+      <div class="bar"><i id="coresBar"></i></div>
+    </div>
+    <div class="stat">
+      <div class="k">Pool</div>
+      <div class="pilltext" id="poolPill"><span class="d"></span><span id="poolTxt">offline</span></div>
+    </div>
+    <div class="stat">
+      <div class="k">Battery</div>
+      <div class="pilltext" id="battPill"><span class="d"></span><span id="battTxt">—</span></div>
+    </div>
+  </div>
+
+  <div class="reason" id="reason"></div>
+  <div class="devfee" id="devFeeNote">◈ ~2% of mining time supports development</div>
+  <footer>
+    <div class="tagline">bare-metal randomx · on-device</div>
+    <div class="studio">
+      <div class="blade"><i></i></div>
+      <div class="jk">JackKnife</div>
+      <div class="st">Studios</div>
+    </div>
+  </footer>
+
+  <div class="qrmodal" id="qrModal">
+    <div class="qrcard glass">
+      <div class="qrtitle">Scan to pay</div>
+      <div class="qrframe"><canvas id="qrCanvas"></canvas></div>
+      <div class="qraddr" id="qrAddr"></div>
+      <div class="qrclose" id="qrClose">Close</div>
+    </div>
+  </div>
+
+  <div class="qrmodal" id="scanModal">
+    <div class="qrcard glass">
+      <div class="qrtitle">Scan wallet QR</div>
+      <div class="scanview">
+        <video id="scanVideo" playsinline muted autoplay></video>
+        <div class="scanframe"></div>
+      </div>
+      <div class="scanstatus" id="scanStatus">Point the camera at a wallet QR</div>
+      <div class="scanactions">
+        <label>From image<input type="file" id="scanFile" accept="image/*"></label>
+        <div class="qrclose" id="scanClose">Close</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="qrmodal" id="shareModal">
+    <div class="qrcard glass">
+      <div class="qrtitle">Share the app</div>
+      <div class="qrframe"><canvas id="shareCanvas"></canvas></div>
+      <div class="shareurl" id="shareUrl"></div>
+      <div class="sharehint" id="shareHint">Scan with the other phone’s camera (same Wi-Fi)</div>
+      <div class="qrclose" id="shareClose">Close</div>
+    </div>
+  </div>
+
+<script src="qr.js"></script>
+<script src="jsQR.js"></script>
+<script>
+(function(){
+  "use strict";
+  var HEX = "polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)";
+  // ----- build the core ring (rebuilds to match the phone's real core count) -----
+  var ring = document.getElementById('ring'), cores=[], ringN=0;
+  function buildRing(n){
+    n = Math.max(1, n|0);
+    if(n===ringN) return;
+    ringN=n; ring.innerHTML=''; cores=[];
+    var R=39;
+    for(var i=0;i<n;i++){
+      var a = (-90 + i*(360/n)) * Math.PI/180;
+      var el=document.createElement('div');
+      el.className='core'; el.setAttribute('data-n', i+1);
+      el.style.left = (40 + R*Math.cos(a)) + '%';
+      el.style.top  = (40 + R*Math.sin(a)) + '%';
+      ring.appendChild(el); cores.push(el);
+    }
+  }
+  buildRing(8);   // S25 & S20 both have 8; corrected once real maxCores arrives
+
+  // ----- thermal color mapping -----
+  function thermal(t){
+    if(t==null) return getcss('--t-good');
+    if(t<45) return getcss('--t-cool');
+    if(t<58) return getcss('--t-good');
+    if(t<68) return getcss('--t-warm');
+    if(t<75) return getcss('--t-hot');
+    return getcss('--t-crit');
+  }
+  function getcss(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+  // ----- state + render -----
+  var S = { mining:false, mode:'adaptive', activeCores:0, maxCores:8,
+            hashrate:0, shares:{good:0,total:0}, pool:{connected:false,url:''},
+            tempC:null, battery:{level:null,charging:false}, reason:'' };
+  var shownHr = 0;
+
+  // ----- live pulse: history, peak, session, earnings estimate -----
+  var hrHist=[], hrPeak=0, sessionStart=0;
+  var NET_HASH=2.8e9, XMR_PER_DAY=432;   // Monero tail emission ≈0.6 XMR × 720 blocks/day
+  function estUxmrDay(hr){ return hr/NET_HASH*XMR_PER_DAY*1e6; }   // micro-XMR / day (rough est)
+  function hexA(hex,a){
+    if(!hex) return 'rgba(52,211,153,'+a+')';
+    hex=hex.replace('#','').trim();
+    if(hex.length===3) hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    if(hex.length<6) return 'rgba(52,211,153,'+a+')';
+    var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);
+    return 'rgba('+r+','+g+','+b+','+a+')';
+  }
+  var spark=document.getElementById('spark'), sctx=spark?spark.getContext('2d'):null;
+  function drawSpark(){
+    if(!sctx) return;
+    var dpr=window.devicePixelRatio||1, w=spark.clientWidth||300, h=spark.clientHeight||52;
+    if(spark.width!==Math.round(w*dpr)){ spark.width=Math.round(w*dpr); spark.height=Math.round(h*dpr); }
+    sctx.setTransform(dpr,0,0,dpr,0,0);
+    sctx.clearRect(0,0,w,h);
+    var n=hrHist.length; if(n<2) return;
+    var acc=getcss('--accent')||'#34D399', pad=3, floor=h-pad;
+    var mx=Math.max(hrPeak,1)*1.18;
+    function X(i){ return pad + i/(n-1)*(w-pad*2); }
+    function Y(v){ return pad + (1-Math.min(v,mx)/mx)*(floor-pad); }
+    sctx.beginPath(); sctx.moveTo(X(0),floor);
+    for(var i=0;i<n;i++) sctx.lineTo(X(i),Y(hrHist[i]));
+    sctx.lineTo(X(n-1),floor); sctx.closePath();
+    var g=sctx.createLinearGradient(0,pad,0,floor);
+    g.addColorStop(0,hexA(acc,.32)); g.addColorStop(1,hexA(acc,0));
+    sctx.fillStyle=g; sctx.fill();
+    sctx.beginPath();
+    for(var j=0;j<n;j++){ var x=X(j),y=Y(hrHist[j]); j?sctx.lineTo(x,y):sctx.moveTo(x,y); }
+    sctx.strokeStyle=acc; sctx.lineWidth=2; sctx.lineJoin='round'; sctx.lineCap='round';
+    sctx.shadowColor=acc; sctx.shadowBlur=7; sctx.stroke(); sctx.shadowBlur=0;
+    var hx=X(n-1),hy=Y(hrHist[n-1]);
+    sctx.beginPath(); sctx.arc(hx,hy,2.6,0,7); sctx.fillStyle='#eafcff'; sctx.fill();
+  }
+  function fmtDur(ms){
+    var s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor(s%3600/60), ss=s%60;
+    return h? (h+':'+String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0'))
+            : (m+':'+String(ss).padStart(2,'0'));
+  }
+  function nowMs(){ return (new Date()).getTime(); }
+
+  function render(){
+    document.body.classList.toggle('on', S.mining);
+    document.documentElement.style.setProperty('--accent', thermal(S.tempC));
+    // aurora breathes brighter with hashrate
+    var au=document.querySelector('.aurora');
+    if(au) au.style.opacity = S.mining ? (0.55 + Math.min(0.4, S.hashrate/2500*0.4)).toFixed(2) : '';
+    document.getElementById('stateLabel').textContent =
+      S.mining ? (S.paused ? 'paused' : (S.mode==='adaptive'?'adaptive':'mining')) : 'idle';
+
+    // reserve note reflects what the current mode actually does
+    var rt=document.getElementById('reserveTxt');
+    if(rt){
+      rt.textContent = S.mode==='8'
+        ? 'MAX — all cores, best while charging'
+        : (S.mode==='adaptive' ? '2 cores reserved for system'
+                               : S.mode+' cores fixed');
+    }
+
+    // cores — pulse faster as hashrate climbs
+    var pulse = clamp(2.8 - S.hashrate/1200*1.6, 1.15, 2.8);
+    document.documentElement.style.setProperty('--pulse', pulse.toFixed(2)+'s');
+    buildRing(S.maxCores||8);
+    for(var i=0;i<cores.length;i++) cores[i].classList.toggle('lit', S.mining && i < S.activeCores);
+    var cv=document.getElementById('coresV');
+    cv.firstChild.nodeValue = S.mining? S.activeCores : 0;
+    document.getElementById('coresMax').textContent = '/'+S.maxCores;
+    setBar('coresBar', (S.mining?S.activeCores:0)/S.maxCores*100, thermal(S.tempC));
+
+    // temp
+    var tv=document.getElementById('tempV');
+    tv.firstChild.nodeValue = (S.tempC==null?'—':Math.round(S.tempC));
+    setBar('tempBar', S.tempC==null?0:clamp((S.tempC-30)/(85-30)*100,0,100), thermal(S.tempC));
+
+    // pool
+    var pp=document.getElementById('poolPill');
+    pp.className='pilltext'+(S.pool.connected?' ok':'');
+    document.getElementById('poolTxt').textContent = S.pool.connected?'connected':(S.mining?'connecting':'offline');
+
+    // battery
+    var bp=document.getElementById('battPill'), bl=S.battery.level;
+    bp.className='pilltext'+(bl==null?'':(bl<20&&!S.battery.charging?' warn':' ok'));
+    document.getElementById('battTxt').textContent =
+      (bl==null?'—':bl+'%') + (S.battery.charging?' ⚡':'');
+
+    // live pulse card
+    drawSpark();
+    document.getElementById('hrPeak').textContent = Math.round(hrPeak).toLocaleString();
+    document.getElementById('estDay').textContent = S.mining
+      ? '≈ '+Math.round(estUxmrDay(S.hashrate)).toLocaleString() : '≈ 0';
+    document.getElementById('uptime').textContent = sessionStart ? fmtDur(nowMs()-sessionStart) : '0:00';
+
+    // shares + reason
+    document.getElementById('hrSub').textContent = S.shares.good + ' accepted';
+    document.getElementById('reason').innerHTML = S.reason? ('<b>▹</b> '+S.reason) : '';
+    var df=document.getElementById('devFeeNote');
+    if(df){ df.classList.toggle('active', !!S.devFee);
+      df.textContent = S.devFee ? '◈ supporting development — thank you'
+                                : '◈ ~2% of mining time supports development'; }
+    document.getElementById('mineLabel').textContent = S.mining?'Stop mining':'Start mining';
+  }
+  function setBar(id,pct,color){var b=document.getElementById(id); b.style.width=clamp(pct,0,100)+'%'; b.style.background=color;}
+  function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+
+  // smooth hashrate counter
+  function tickHr(){
+    var target=S.mining?S.hashrate:0;
+    shownHr += (target-shownHr)*0.18;
+    if(Math.abs(target-shownHr)<0.5) shownHr=target;
+    document.getElementById('hrVal').textContent = Math.round(shownHr).toLocaleString();
+    requestAnimationFrame(tickHr);
+  }
+  tickHr();
+
+  // ----- bridge to the app (Java) or graceful fallback -----
+  var Bridge = window.PocketRig || null;   // injected by the Android app
+  // Android's JavascriptInterface resolves methods by ARGUMENT COUNT. Passing an
+  // arg to a zero-arg method (status/start/stop) matches nothing and silently
+  // fails — so only pass an argument when we actually have one.
+  function call(name,arg){
+    try{
+      if(Bridge&&Bridge[name])
+        return (arg===undefined) ? Bridge[name]() : Bridge[name](arg);
+    }catch(e){}
+    return null;
+  }
+
+  // controls
+  document.getElementById('mineBtn').onclick=function(){
+    S.mining=!S.mining;
+    if(S.mining){
+      // Persist current settings BEFORE starting, so a tap always mines to the
+      // shown wallet even if the field was never focused/blurred.
+      call('setWallet', document.getElementById('wallet').value.trim());
+      call('setPool', poolValue());
+      call('setMode', S.mode);
+    }
+    call(S.mining?'start':'stop');
+    try{ if(navigator.vibrate) navigator.vibrate(S.mining?28:14); }catch(e){}
+    if(!Bridge) demoKick();      // preview animation when no app bridge
+    render();
+  };
+  document.getElementById('modeSeg').onclick=function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    S.mode=b.dataset.mode; call('setMode',S.mode);
+    [].forEach.call(this.children,function(c){c.classList.toggle('sel',c===b);});
+    render();
+  };
+  // auto-start-when-charging toggle
+  S.autoCharge = false;                    // matches the app default; synced from status
+  var autoSw=document.getElementById('autoChargeSw');
+  function renderAuto(){ autoSw.classList.toggle('on', !!S.autoCharge); }
+  document.getElementById('autoChargeRow').onclick=function(){
+    S.autoCharge=!S.autoCharge; renderAuto(); call('setAutoCharge', S.autoCharge);
+    try{ if(navigator.vibrate) navigator.vibrate(10); }catch(e){}
+  };
+  renderAuto();
+
+  // ---- QR draw (self-contained encoder, no network) ----
+  function drawQROn(canvas,text){
+    var ctx=canvas.getContext('2d');
+    var r=QR.encode(text,'M'), n=r.size, q=4, dim=n+2*q;
+    var px=Math.max(3, Math.floor(300/dim));
+    canvas.width=dim*px; canvas.height=dim*px;
+    ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#0a0d12';
+    for(var y=0;y<n;y++) for(var x=0;x<n;x++)
+      if(r.modules[y][x]) ctx.fillRect((x+q)*px,(y+q)*px,px,px);
+  }
+  function openQR(){
+    var addr=document.getElementById('wallet').value.trim();
+    if(!addr) return;
+    try{ drawQROn(document.getElementById('qrCanvas'),addr); }catch(e){ return; }
+    document.getElementById('qrAddr').textContent=addr;
+    document.getElementById('qrModal').classList.add('show');
+    try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+  }
+  var qrBtn=document.getElementById('qrBtn'); if(qrBtn) qrBtn.onclick=openQR;
+  var qrModal=document.getElementById('qrModal');
+  if(qrModal) qrModal.onclick=function(e){ if(e.target===this||e.target.id==='qrClose') this.classList.remove('show'); };
+
+  // ---- extract a Monero address from decoded QR text ----
+  function extractAddr(text){
+    if(!text) return null; text=(''+text).trim();
+    var m=text.match(/^monero:([^?&\s]+)/i); if(m) text=m[1];
+    if(/^[48][1-9A-HJ-NP-Za-km-z]{89,104}$/.test(text) && (text.length===95||text.length===106)) return text;
+    return null;
+  }
+  function acceptWallet(addr){
+    stopScan();
+    var wf=document.getElementById('wallet'); wf.value=addr; call('setWallet',addr);
+    var sm=document.getElementById('scanModal'); if(sm) sm.classList.remove('show');
+    try{ if(navigator.vibrate) navigator.vibrate([0,30,45,30]); }catch(e){}
+  }
+  function setScanStatus(t){ var e=document.getElementById('scanStatus'); if(e) e.textContent=t; }
+
+  // ---- wallet QR scanner (camera + screenshot), decoder = jsQR ----
+  var scanStream=null, scanRAF=null;
+  function stopScan(){
+    if(scanRAF){ cancelAnimationFrame(scanRAF); scanRAF=null; }
+    if(scanStream){ try{ scanStream.getTracks().forEach(function(t){t.stop();}); }catch(e){} scanStream=null; }
+    var v=document.getElementById('scanVideo'); if(v) v.srcObject=null;
+  }
+  function openScan(){
+    document.getElementById('scanModal').classList.add('show');
+    setScanStatus('Point the camera at a wallet QR');
+    var video=document.getElementById('scanVideo');
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ setScanStatus('No camera — use “From image”'); return; }
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(stream){
+      scanStream=stream; video.srcObject=stream; video.play();
+      var c=document.createElement('canvas'), ctx=c.getContext('2d');
+      function tick(){
+        if(!scanStream) return;
+        if(video.readyState>=2 && video.videoWidth){
+          c.width=video.videoWidth; c.height=video.videoHeight;
+          ctx.drawImage(video,0,0,c.width,c.height);
+          try{
+            var img=ctx.getImageData(0,0,c.width,c.height);
+            var code=(typeof jsQR!=='undefined') ? jsQR(img.data,img.width,img.height) : null;
+            if(code){ var a=extractAddr(code.data); if(a){ acceptWallet(a); return; } else setScanStatus('That QR isn’t a Monero address'); }
+          }catch(e){}
+        }
+        scanRAF=requestAnimationFrame(tick);
+      }
+      scanRAF=requestAnimationFrame(tick);
+    }).catch(function(){ setScanStatus('Camera blocked — use “From image”'); });
+  }
+  function decodeImageFile(f){
+    var img=new Image(), url=URL.createObjectURL(f);
+    img.onload=function(){
+      var c=document.createElement('canvas'), ctx=c.getContext('2d');
+      var mx=1600, sc=Math.min(1, mx/Math.max(img.naturalWidth,img.naturalHeight));
+      c.width=Math.round(img.naturalWidth*sc); c.height=Math.round(img.naturalHeight*sc);
+      ctx.drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      try{
+        var d=ctx.getImageData(0,0,c.width,c.height);
+        var code=(typeof jsQR!=='undefined') ? jsQR(d.data,d.width,d.height) : null;
+        var a=code&&extractAddr(code.data);
+        if(a) acceptWallet(a); else setScanStatus('No wallet QR found in that image');
+      }catch(e){ setScanStatus('Could not read that image'); }
+    };
+    img.onerror=function(){ setScanStatus('Could not open that image'); };
+    img.src=url;
+  }
+  var scanBtn=document.getElementById('scanBtn'); if(scanBtn) scanBtn.onclick=openScan;
+  var scanClose=document.getElementById('scanClose'); if(scanClose) scanClose.onclick=function(){ stopScan(); document.getElementById('scanModal').classList.remove('show'); };
+  var scanModal=document.getElementById('scanModal');
+  if(scanModal) scanModal.onclick=function(e){ if(e.target===this){ stopScan(); this.classList.remove('show'); } };
+  var scanFile=document.getElementById('scanFile'); if(scanFile) scanFile.onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(f) decodeImageFile(f); e.target.value=''; };
+
+  // ---- share the app to a nearby phone via QR ----
+  function openShare(){
+    var modal=document.getElementById('shareModal'); modal.classList.add('show');
+    var raw=call('shareApp'), d=null;
+    try{ d=raw?JSON.parse(raw):null; }catch(e){}
+    var urlEl=document.getElementById('shareUrl'), hintEl=document.getElementById('shareHint');
+    var canvas=document.getElementById('shareCanvas');
+    if(d && d.url){
+      try{ drawQROn(canvas,d.url); }catch(e){}
+      urlEl.textContent=d.url;
+      hintEl.textContent='Scan with the other phone’s camera (same Wi-Fi)';
+    } else {
+      canvas.width=canvas.height=0;
+      urlEl.textContent = d&&d.error ? d.error : 'Sharing needs the installed app';
+      hintEl.textContent='Connect to Wi-Fi or turn on a hotspot, then try again';
+    }
+  }
+  var shareBtn=document.getElementById('shareBtn'); if(shareBtn) shareBtn.onclick=openShare;
+  var shareModal=document.getElementById('shareModal');
+  if(shareModal) shareModal.onclick=function(e){ if(e.target===this||e.target.id==='shareClose') this.classList.remove('show'); };
+
+  var w=document.getElementById('wallet');
+  w.addEventListener('focus',function(){document.getElementById('walletField').classList.add('focus');});
+  w.addEventListener('blur',function(){document.getElementById('walletField').classList.remove('focus'); call('setWallet',w.value.trim());});
+  // pool picker + custom-pool entry
+  var poolSel=document.getElementById('pool');
+  var customField=document.getElementById('customPoolField');
+  var customInput=document.getElementById('customPool');
+  function poolValue(){ return poolSel.value==='custom' ? customInput.value.trim() : poolSel.value; }
+  poolSel.onchange=function(){
+    if(this.value==='custom'){ customField.classList.add('show'); customInput.focus(); }
+    else { customField.classList.remove('show'); call('setPool', this.value); }
+  };
+  customInput.addEventListener('focus',function(){customField.classList.add('focus');});
+  customInput.addEventListener('blur',function(){
+    customField.classList.remove('focus');
+    var v=customInput.value.trim(); if(v) call('setPool', v);
+  });
+
+  // ----- live status: prefer app bridge, else poll status.json -----
+  function poll(){
+    var raw = call('status');            // app returns JSON string
+    if(raw){ try{ apply(JSON.parse(raw)); }catch(e){} return; }
+    fetch('status.json',{cache:'no-store'}).then(function(r){return r.json();})
+      .then(apply).catch(function(){});
+  }
+  function shareHit(){
+    var v=document.getElementById('hrVal');
+    if(v){ v.classList.remove('pop'); void v.offsetWidth; v.classList.add('pop'); }
+    var hero=document.querySelector('.hero');
+    if(hero){ hero.classList.remove('hit'); void hero.offsetWidth; hero.classList.add('hit'); }
+    // ripple across the lit cores
+    for(var i=0;i<cores.length;i++){ (function(el){
+      if(!el.classList.contains('lit')) return;
+      el.classList.remove('burst'); void el.offsetWidth; el.classList.add('burst');
+    })(cores[i]); }
+    // every 10th accepted share = milestone particle burst + bigger haptic
+    var milestone = S.shares.good>0 && S.shares.good%10===0;
+    if(milestone) milestoneBurst();
+    try{ if(navigator.vibrate) navigator.vibrate(milestone?[0,25,45,25,70]:[0,16,38,12]); }catch(e){}
+  }
+  function milestoneBurst(){
+    var hero=document.querySelector('.hero'); if(!hero) return;
+    for(var i=0;i<16;i++){
+      var p=document.createElement('span'); p.className='particle';
+      var ang=(i/16)*Math.PI*2, dist=58+((i*37)%50);
+      p.style.setProperty('--tx',(Math.cos(ang)*dist).toFixed(0)+'px');
+      p.style.setProperty('--ty',(Math.sin(ang)*dist).toFixed(0)+'px');
+      hero.appendChild(p);
+      (function(el){ setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 900); })(p);
+    }
+  }
+  function apply(d){
+    if(!d) return;
+    var prevGood=S.shares.good;
+    S.mining=!!d.mining; if(d.mode)S.mode=d.mode;
+    S.activeCores=d.activeCores||0; S.maxCores=d.maxCores||8;
+    S.hashrate=d.hashrate||0; if(d.shares)S.shares=d.shares;
+    if(S.mining && S.shares.good>prevGood) shareHit();
+    // sample the live pulse
+    if(S.mining){
+      if(!sessionStart) sessionStart=nowMs();
+      hrHist.push(S.hashrate); if(hrHist.length>60) hrHist.shift();
+      if(S.hashrate>hrPeak) hrPeak=S.hashrate;
+    } else { sessionStart=0; hrHist.length=0; hrPeak=0; }
+    if(d.pool)S.pool=d.pool; S.tempC=(d.tempC==null?S.tempC:d.tempC);
+    if(d.battery)S.battery=d.battery; S.reason=d.reason||'';
+    if(typeof d.autoCharge==='boolean'){ S.autoCharge=d.autoCharge; renderAuto(); }
+    S.devFee = !!d.devFee;
+    var wasPaused=S.paused; S.paused = !!d.paused;
+    if(S.paused && !wasPaused){ try{ if(navigator.vibrate) navigator.vibrate([30,45,30]); }catch(e){} }
+    // reflect mode selection from source of truth
+    [].forEach.call(document.getElementById('modeSeg').children,function(c){
+      c.classList.toggle('sel', c.dataset.mode===S.mode);});
+    if(d.wallet && document.activeElement!==w && !w.value) w.value=d.wallet;
+    render();
+  }
+  setInterval(poll, 1000); poll();
+
+  // ----- preview demo (only when not embedded in the app) -----
+  var demoT=null;
+  function demoKick(){
+    if(Bridge) return;
+    if(!S.mining){ if(demoT)clearInterval(demoT); demoT=null; S.pool.connected=false; S.reason=''; return; }
+    S.pool.url='gulf.moneroocean.stream:10001';
+    var t0=Date.now();
+    demoT=setInterval(function(){
+      var el=(Date.now()-t0)/1000;
+      S.pool.connected = el>2;
+      // adaptive ramp demo
+      var mx = S.maxCores||8;
+      var target = S.mode==='adaptive' ? Math.min(mx-2, 1+Math.floor(el/2)) : Math.min(mx, parseInt(S.mode)||mx);
+      S.activeCores += Math.sign(target-S.activeCores);
+      S.tempC = 42 + S.activeCores*4.2 + Math.sin(el/3)*1.5;
+      S.hashrate = S.activeCores*210 + Math.sin(el)*30;
+      S.battery={level:82,charging:true};
+      if(el>3 && S.shares.good<9 && Math.random()<0.15){S.shares.good++;S.shares.total++;}
+      S.reason = S.mode==='adaptive'
+        ? (S.tempC>68?'holding — chip warm':'screen off · ramping to 6')
+        : S.mode+'-core fixed';
+      if(!sessionStart) sessionStart=nowMs();
+      hrHist.push(S.hashrate); if(hrHist.length>60) hrHist.shift();
+      if(S.hashrate>hrPeak) hrPeak=S.hashrate;
+      render();
+    },700);
+  }
+  render();
+})();
+</script>
+</body>
+</html>

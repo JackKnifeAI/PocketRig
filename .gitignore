@@ -1,0 +1,26 @@
+# --- Signing keys: NEVER commit these ---
+*.keystore
+*.jks
+*.p12
+keystore.properties
+
+# --- Build outputs ---
+app/build/
+app/gen/
+*.apk
+*.dex
+*.ap_
+
+# --- Engine runtime artifacts (regenerated at run time) ---
+engine/xmrig
+engine/run.log
+engine/gov.log
+engine/httpd.log
+engine/status.json
+engine/config.run.json
+engine/screen
+engine/mode
+
+# --- Editor / OS noise ---
+*.swp
+.DS_Store

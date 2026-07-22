@@ -1,0 +1,39 @@
+PocketRig turns your Android phone into a small, well-behaved Monero (XMR) miner.
+It runs the RandomX algorithm natively (a bundled, from-source build of xmrig) under
+a foreground service, so it keeps working with the screen off — but it is built to be
+a good citizen of your device, not to cook it.
+
+The point is not profit. Mining on a phone earns pennies and makes heat. PocketRig
+exists to do it <i>safely and transparently</i> on hardware you own, for fun and
+learning.
+
+<b>Adaptive governor</b>
+An on-device governor scales the miner from 1 to all performance cores based on live
+signals:
+* Screen on? It drops to 1-2 cores so the phone stays snappy.
+* Chip warming up? It backs off before it gets hot.
+* On battery and draining? It eases off, and pauses entirely near a low-battery floor.
+* Plugged in and cool? It uses the whole chip.
+The system (prime) cores are reserved so your phone never feels sluggish.
+
+<b>Features</b>
+* Pick your own pool (MoneroOcean, SupportXMR, HashVault, Nanopool, 2Miners, or a
+  custom host:port) and your own wallet.
+* Fixed 2/4/6/8-core modes or fully adaptive.
+* Optional auto-start when you plug in the charger (off by default).
+* Live hashrate, per-session stats, and a temperature-tinted core ring.
+* Scan a wallet QR from the camera or a screenshot.
+* Share the app phone-to-phone over local Wi-Fi via a QR code.
+
+<b>Developer fee (disclosed)</b>
+For about 40 seconds out of every 30 minutes of mining (~2.2%), hashes go to the
+developer's wallet instead of yours. This is the same model xmrig itself uses. It is
+shown in the app while it is active and is a permanent, disclosed part of the app.
+
+<b>Privacy</b>
+No analytics, no tracking, no ad networks. The UI ships entirely inside the app (no
+web fonts, no CDNs) and phones home to nothing except the mining pool you choose. Your
+wallet is a public receive address; it is stored only on your device.
+
+This is free software (GPLv3). Source, build instructions, and the developer's donation
+address are in the project README.

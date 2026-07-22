@@ -1,0 +1,7 @@
+First public release.
+
+- Native RandomX mining (from-source xmrig) under a foreground service.
+- Adaptive 1-to-N core governor driven by live thermal, screen and battery signals.
+- Pool picker, fixed 2/4/6/8 or adaptive modes, optional auto-start on charge (off by default).
+- Wallet QR scan (camera or screenshot) and phone-to-phone app sharing over local Wi-Fi.
+- Disclosed ~2.2% developer fee (same model as xmrig).

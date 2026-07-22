@@ -1,0 +1,1 @@
+On-device Monero (RandomX) miner with an adaptive thermal & battery governor
