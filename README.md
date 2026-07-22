@@ -14,7 +14,11 @@ and battery signals — using your phone hard only when it's safe to.
 
 ## Install
 
-- **IzzyOnDroid** (recommended — a trusted F-Droid-compatible repo): _link once published_
+- **Obtainium** (recommended — auto-updates from GitHub Releases): install
+  [Obtainium](https://github.com/ImranR98/Obtainium), then **Add App** and paste
+  `https://github.com/JackKnifeAI/PocketRig`. It tracks every release automatically.
+- **Our F-Droid repo:** add the repo URL to F-Droid / Droid-ify / Neo Store for one-tap
+  updates — _URL published below once live._
 - **GitHub Releases:** grab the latest signed `PocketRig.apk` from the
   [Releases](../../releases) page.
 - **Phone-to-phone:** any installed copy can share itself — tap **Share App**, scan the
